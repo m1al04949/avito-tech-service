@@ -3,7 +3,9 @@ package addtouser
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/go-playground/validator/v10"
@@ -16,14 +18,13 @@ import (
 )
 
 type Request struct {
-	UserID   int             `json:"user_id"`
 	Segments []model.Segment `json:"segments,omitempty"`
 }
 
 type Response struct {
 	response.Response
 	UserID   int             `json:"user_id"`
-	Segments []model.Segment `json:"segments,omitempty"`
+	Segments []model.Segment `json:"segments"`
 	Method   string
 }
 
@@ -36,6 +37,23 @@ func AddToUser(log *slog.Logger, userSegmSaver UserSegmSaver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.addtouser"
 
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			log.Info("id is empty")
+
+			render.JSON(w, r, response.Error("invalid request"))
+
+			return
+		}
+		user, err := strconv.Atoi(id)
+		if err != nil {
+			log.Info("id is not int")
+
+			render.JSON(w, r, response.Error("invalid id"))
+
+			return
+		}
+
 		log = log.With(
 			slog.String("op", op),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
@@ -43,7 +61,7 @@ func AddToUser(log *slog.Logger, userSegmSaver UserSegmSaver) http.HandlerFunc {
 
 		var req Request
 
-		err := render.DecodeJSON(r.Body, &req)
+		err = render.DecodeJSON(r.Body, &req)
 		if err != nil {
 			log.Error("failed to decode request body", logger.Err(err))
 
@@ -64,13 +82,12 @@ func AddToUser(log *slog.Logger, userSegmSaver UserSegmSaver) http.HandlerFunc {
 			return
 		}
 
-		user := req.UserID
 		segms := req.Segments
 		segments := segmentsconv.SegmentsConv(segms)
 
 		err = userSegmSaver.SaveSegmToUser(user, segments)
 		if errors.Is(err, storage.ErrUserExists) {
-			log.Info("user already exists", slog.Int("user", req.UserID))
+			log.Info("user already exists", slog.Int("user", user))
 		}
 		if err != nil {
 			log.Error("failed to save user", logger.Err(err))

@@ -3,16 +3,19 @@ package adduser
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 	"github.com/m1al04949/avito-tech-service/internal/lib/response"
 	"github.com/m1al04949/avito-tech-service/internal/logger"
 	"github.com/m1al04949/avito-tech-service/internal/storage"
 	"golang.org/x/exp/slog"
 )
+
+type Request struct {
+	UserID int `json:"user_id"`
+}
 
 type Response struct {
 	response.Response
@@ -34,23 +37,30 @@ func AddUser(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			log.Info("id is empty")
+		var req Request
 
-			render.JSON(w, r, response.Error("invalid request"))
-
-			return
-		}
-
-		user, err := strconv.Atoi(id)
+		err := render.DecodeJSON(r.Body, &req)
 		if err != nil {
-			log.Info("id is not int")
+			log.Error("failed to decode request body", logger.Err(err))
 
-			render.JSON(w, r, response.Error("invalid id"))
+			render.JSON(w, r, response.Error("failed to decode request"))
 
 			return
 		}
+
+		log.Info("request body decoded", slog.Any("request", req))
+
+		if err := validator.New().Struct(req); err != nil {
+			validateErr := err.(validator.ValidationErrors)
+
+			log.Error("invalid request", logger.Err(err))
+
+			render.JSON(w, r, response.ValidationError(validateErr))
+
+			return
+		}
+
+		user := req.UserID
 
 		err = userSaver.SaveUser(user)
 		if errors.Is(err, storage.ErrUserExists) {

@@ -3,10 +3,10 @@ package deleteuser
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 	"github.com/m1al04949/avito-tech-service/internal/lib/response"
 	"github.com/m1al04949/avito-tech-service/internal/logger"
 	"github.com/m1al04949/avito-tech-service/internal/storage"
@@ -32,24 +32,35 @@ func DeleteUser(log *slog.Logger, userDeleter UserDeleter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.deleteuser"
 
-		id := chi.URLParam(r, "id")
-		if id == "" {
-			log.Info("id is empty")
+		log = log.With(
+			slog.String("op", op),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
+		)
 
-			render.JSON(w, r, response.Error("invalid request"))
+		var req Request
 
-			return
-		}
-
-		user, err := strconv.Atoi(id)
+		err := render.DecodeJSON(r.Body, &req)
 		if err != nil {
-			log.Info("id is not int")
+			log.Error("failed to decode request body", logger.Err(err))
 
-			render.JSON(w, r, response.Error("invalid id"))
+			render.JSON(w, r, response.Error("failed to decode request"))
 
 			return
 		}
 
+		log.Info("request body decoded", slog.Any("request", req))
+
+		if err := validator.New().Struct(req); err != nil {
+			validateErr := err.(validator.ValidationErrors)
+
+			log.Error("invalid request", logger.Err(err))
+
+			render.JSON(w, r, response.ValidationError(validateErr))
+
+			return
+		}
+
+		user := req.UserID
 		err = userDeleter.DeleteUser(user)
 
 		if errors.Is(err, storage.ErrUserNotExists) {

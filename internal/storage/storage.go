@@ -201,8 +201,11 @@ func (s *Storage) DeleteUser(userToDelete int) error {
 func (s *Storage) SaveSegmToUser(user int, userToSave []string) error {
 	const op = "storage.AddToUser"
 
-	m := &model.UserSegments{
-		UserID: user,
+	m := &model.UserSegments{}
+
+	if err := s.db.QueryRow("SELECT (created_at) FROM users WHERE user_id=$1",
+		user).Scan(&m.UserID); err != nil {
+		return fmt.Errorf("%s: %w", op, ErrUserNotExists)
 	}
 
 	rows, err := s.db.Query(`SELECT segment_name FROM user_segments
