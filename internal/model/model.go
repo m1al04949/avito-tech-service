@@ -2,13 +2,21 @@ package model
 
 import "time"
 
-type Segment struct {
+type Segments struct {
 	SegmentName string
 	CreatedAt   time.Time
 }
 
-type User struct {
+type Users struct {
 	UserID    int
-	Username  string
 	CreatedAt time.Time
+}
+
+type UserSegments struct {
+	UserID      int
+	SegmentName string
+}
+
+type Segment struct {
+	Slug string `json:"slug,omitempty"`
 }

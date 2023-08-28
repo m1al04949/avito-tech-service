@@ -91,7 +91,7 @@ func (s *Storage) CreateTabs() error {
 func (s *Storage) SaveSegm(segmToSave string) error {
 	const op = "storage.SaveSegm"
 
-	m := &model.Segment{
+	m := &model.Segments{
 		SegmentName: segmToSave,
 	}
 
@@ -120,7 +120,7 @@ func (s *Storage) SaveSegm(segmToSave string) error {
 func (s *Storage) DeleteSegm(segmToDelete string) error {
 	const op = "storage.DeleteSegm"
 
-	m := &model.Segment{
+	m := &model.Segments{
 		SegmentName: segmToDelete,
 	}
 
@@ -146,7 +146,7 @@ func (s *Storage) DeleteSegm(segmToDelete string) error {
 func (s *Storage) SaveUser(userToSave int) error {
 	const op = "storage.SaveUser"
 
-	m := &model.User{
+	m := &model.Users{
 		UserID: userToSave,
 	}
 
@@ -171,11 +171,11 @@ func (s *Storage) SaveUser(userToSave int) error {
 	return nil
 }
 
-// Delete User and Segments for him
+// Delete User
 func (s *Storage) DeleteUser(userToDelete int) error {
 	const op = "storage.DeleteUser"
 
-	m := &model.User{
+	m := &model.Users{
 		UserID: userToDelete,
 	}
 
@@ -198,7 +198,30 @@ func (s *Storage) DeleteUser(userToDelete int) error {
 }
 
 // Save Segments for User
-func (s *Storage) SaveSegmToUser(userToSave string) error {
+func (s *Storage) SaveSegmToUser(user int, userToSave []string) error {
+	const op = "storage.AddToUser"
+
+	m := &model.UserSegments{
+		UserID: user,
+	}
+
+	rows, err := s.db.Query(`SELECT segment_name FROM user_segments
+						   WHERE user_id=$1`, user)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, ErrUserNotExists)
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(&m.SegmentName); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+	}
+
+	return nil
+}
+
+// Delete Segments for User
+func (s *Storage) DeleteSegmFromUser(user int, userToSave []string) error {
 
 	return nil
 }

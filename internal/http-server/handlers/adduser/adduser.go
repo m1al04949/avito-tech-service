@@ -3,38 +3,28 @@ package adduser
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/go-playground/validator/v10"
 	"github.com/m1al04949/avito-tech-service/internal/lib/response"
 	"github.com/m1al04949/avito-tech-service/internal/logger"
 	"github.com/m1al04949/avito-tech-service/internal/storage"
 	"golang.org/x/exp/slog"
 )
 
-type Segment struct {
-	Slug string `json:"slug,omitempty"`
-}
-
-type Request struct {
-	UserID   int       `json:"user_id"`
-	Segments []Segment `json:"segments,,omitempty"`
-}
-
 type Response struct {
 	response.Response
-	UserID   int       `json:"user_id"`
-	Segments []Segment `json:"segments,omitempty"`
-	Method   string
+	UserID int `json:"user_id"`
+	Method string
 }
 
 type UserSaver interface {
 	SaveUser(int) error
-	SaveSegmToUser(string) error
 }
 
-func AddToUser(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
+func AddUser(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		const op = "handlers.adduser"
@@ -44,35 +34,27 @@ func AddToUser(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
-		var req Request
+		id := chi.URLParam(r, "id")
+		if id == "" {
+			log.Info("id is empty")
 
-		err := render.DecodeJSON(r.Body, &req)
+			render.JSON(w, r, response.Error("invalid request"))
+
+			return
+		}
+
+		user, err := strconv.Atoi(id)
 		if err != nil {
-			log.Error("failed to decode request body", logger.Err(err))
+			log.Info("id is not int")
 
-			render.JSON(w, r, response.Error("failed to decode request"))
-
-			return
-		}
-
-		log.Info("request body decoded", slog.Any("request", req))
-
-		if err := validator.New().Struct(req); err != nil {
-			validateErr := err.(validator.ValidationErrors)
-
-			log.Error("invalid request", logger.Err(err))
-
-			render.JSON(w, r, response.ValidationError(validateErr))
+			render.JSON(w, r, response.Error("invalid id"))
 
 			return
 		}
-
-		user := req.UserID
-		// segments := req.Segments
 
 		err = userSaver.SaveUser(user)
 		if errors.Is(err, storage.ErrUserExists) {
-			log.Info("user already exists", slog.Int("user", req.UserID))
+			log.Info("user already exists", slog.Int("user", user))
 		}
 		if err != nil {
 			log.Error("failed to save user", logger.Err(err))
@@ -85,8 +67,7 @@ func AddToUser(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 		render.JSON(w, r, Response{
 			Response: response.OK(),
 			UserID:   user,
-			// Segment:  segment,
-			Method: r.Method,
+			Method:   r.Method,
 		})
 	}
 }
