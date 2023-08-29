@@ -15,10 +15,13 @@ type Storage struct {
 }
 
 var (
-	ErrSegmentExists    = errors.New("segment exists")
-	ErrSegmentNotExists = errors.New("segment not exists")
-	ErrUserExists       = errors.New("user exists")
-	ErrUserNotExists    = errors.New("user not exists")
+	ErrSegmentExists     = errors.New("segment exists")
+	ErrSegmentNotExists  = errors.New("segment not exists")
+	ErrSegmentsNotExists = errors.New("segments not exists")
+	ErrUserExists        = errors.New("user exists")
+	ErrUserNotExists     = errors.New("user not exists")
+	ErrUserDelete        = errors.New("delete user from user segments table")
+	ErrSegmentDelete     = errors.New("delete segment from user segments table")
 )
 
 // Get instance
@@ -135,7 +138,7 @@ func (s *Storage) DeleteSegm(segmToDelete string) error {
 
 		_, err = stmt.Exec(segmToDelete)
 		if err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return fmt.Errorf("%s: %w", op, ErrSegmentDelete)
 		}
 	}
 
@@ -190,7 +193,7 @@ func (s *Storage) DeleteUser(userToDelete int) error {
 
 		_, err = stmt.Exec(userToDelete)
 		if err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return fmt.Errorf("%s: %w", op, ErrUserDelete)
 		}
 	}
 
@@ -198,25 +201,46 @@ func (s *Storage) DeleteUser(userToDelete int) error {
 }
 
 // Save Segments for User
-func (s *Storage) SaveSegmToUser(user int, userToSave []string) error {
+func (s *Storage) SaveSegmToUser(user int, segments []string) error {
 	const op = "storage.AddToUser"
 
-	m := &model.UserSegments{}
+	var userExists bool
 
-	if err := s.db.QueryRow("SELECT (created_at) FROM users WHERE user_id=$1",
-		user).Scan(&m.UserID); err != nil {
+	if err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE user_id=$1)",
+		user).Scan(&userExists); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if !userExists {
 		return fmt.Errorf("%s: %w", op, ErrUserNotExists)
 	}
 
-	rows, err := s.db.Query(`SELECT segment_name FROM user_segments
-						   WHERE user_id=$1`, user)
-	if err != nil {
-		return fmt.Errorf("%s: %w", op, ErrUserNotExists)
-	}
-
-	for rows.Next() {
-		if err := rows.Scan(&m.SegmentName); err != nil {
+	existingSegments := make([]string, 0, len(segments))
+	for _, v := range segments {
+		var segmentExists bool
+		err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM segments WHERE segment_name=$1)", v).Scan(&segmentExists)
+		if err != nil {
 			return fmt.Errorf("%s: %w", op, err)
+		}
+		if segmentExists {
+			existingSegments = append(existingSegments, v)
+		}
+	}
+	if len(existingSegments) == 0 {
+		return fmt.Errorf("%s: %w", op, ErrSegmentsNotExists)
+	}
+
+	stmt, err := s.db.Prepare("INSERT INTO user_segments(user_id, segment_name) VALUES ($1, $2)")
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	defer stmt.Close()
+
+	for _, v := range existingSegments {
+		_, err := stmt.Exec(user, v)
+		if err != nil {
+			if sqlErr, ok := err.(*pq.Error); ok && sqlErr.Code == "23505" {
+				continue
+			}
 		}
 	}
 
@@ -224,7 +248,54 @@ func (s *Storage) SaveSegmToUser(user int, userToSave []string) error {
 }
 
 // Delete Segments for User
-func (s *Storage) DeleteSegmFromUser(user int, userToSave []string) error {
+func (s *Storage) DeleteSegmFromUser(user int, segments []string) error {
+	const op = "storage.deletesegmentsfromuser"
+
+	var userExists bool
+
+	if err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE user_id=$1)",
+		user).Scan(&userExists); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if !userExists {
+		return fmt.Errorf("%s: %w", op, ErrUserNotExists)
+	}
+
+	existingSegments := make([]string, 0, len(segments))
+	for _, v := range segments {
+		var segmentExists bool
+		err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM segments WHERE segment_name=$1)", v).Scan(&segmentExists)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+		if segmentExists {
+			existingSegments = append(existingSegments, v)
+		}
+	}
+	if len(existingSegments) == 0 {
+		return fmt.Errorf("%s: %w", op, ErrSegmentsNotExists)
+	}
+
+	stmt, err := s.db.Prepare("DELETE FROM user_segments WHERE user_id=$1 AND segment_name=$2")
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	defer stmt.Close()
+
+	for _, v := range existingSegments {
+		_, err := stmt.Exec(user, v)
+		if err != nil {
+			if sqlErr, ok := err.(*pq.Error); ok && sqlErr.Code == "23505" {
+				continue
+			}
+		}
+	}
 
 	return nil
+}
+
+// Get User Info
+func (s *Storage) GetUser(user int) (segments []string, err error) {
+
+	return segments, nil
 }

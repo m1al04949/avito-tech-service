@@ -13,6 +13,7 @@ import (
 	"github.com/m1al04949/avito-tech-service/internal/http-server/handlers/deletefromuser"
 	"github.com/m1al04949/avito-tech-service/internal/http-server/handlers/deletesegment"
 	"github.com/m1al04949/avito-tech-service/internal/http-server/handlers/deleteuser"
+	"github.com/m1al04949/avito-tech-service/internal/http-server/handlers/getuser"
 	"github.com/m1al04949/avito-tech-service/internal/http-server/middleware/mwlog"
 	"github.com/m1al04949/avito-tech-service/internal/logger"
 	"github.com/m1al04949/avito-tech-service/internal/storage"
@@ -55,12 +56,13 @@ func RunServer() error {
 			cfg.HTTPServer.User: cfg.HTTPServer.Password,
 		}))
 
-		r.Post("/segment_manage", createsegment.NewSegment(log, store))             // Add Segment
-		r.Post("/users", adduser.AddUser(log, store))                               // Add User
-		r.Post("/user_manage/id={id}", addtouser.AddToUser(log, store))             // Add Segment To User
-		r.Delete("/segment_manage", deletesegment.DelSegment(log, store))           // Delete Segment
-		r.Delete("/users", deleteuser.DeleteUser(log, store))                       // Delete User
-		r.Delete("/user_manage/id={id}", deletefromuser.DeleteFromUser(log, store)) // Delete Segment From User
+		r.Post("/segments", createsegment.NewSegment(log, store))             // Add Segment
+		r.Post("/users", adduser.AddUser(log, store))                         // Add User
+		r.Post("/users/id={id}", addtouser.AddToUser(log, store))             // Add Segment To User
+		r.Delete("/segments", deletesegment.DelSegment(log, store))           // Delete Segment
+		r.Delete("/users", deleteuser.DeleteUser(log, store))                 // Delete User
+		r.Delete("/users/id={id}", deletefromuser.DeleteFromUser(log, store)) // Delete Segment From User
+		r.Get("/users/id={id}", getuser.GetFromUser(log, store))              // Get From User
 	})
 
 	// Start HTTP Server

@@ -70,6 +70,13 @@ func DeleteUser(log *slog.Logger, userDeleter UserDeleter) http.HandlerFunc {
 
 			return
 		}
+		if errors.Is(err, storage.ErrUserDelete) {
+			log.Info("delete user from user segments table", slog.Int("user", user))
+
+			render.JSON(w, r, response.Error("delete user from user segments table"))
+
+			return
+		}
 		if err != nil {
 			log.Error("failed to delete user", logger.Err(err))
 

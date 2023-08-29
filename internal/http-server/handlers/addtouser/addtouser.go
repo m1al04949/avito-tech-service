@@ -86,16 +86,25 @@ func AddToUser(log *slog.Logger, userSegmSaver UserSegmSaver) http.HandlerFunc {
 		segments := segmentsconv.SegmentsConv(segms)
 
 		err = userSegmSaver.SaveSegmToUser(user, segments)
-		if errors.Is(err, storage.ErrUserExists) {
-			log.Info("user already exists", slog.Int("user", user))
+		if errors.Is(err, storage.ErrSegmentsNotExists) {
+			for _, v := range segments {
+				log.Info("segment not exists", slog.String("segment", v))
+			}
+			render.JSON(w, r, response.Error("segments not exists"))
+			return
+		}
+		if errors.Is(err, storage.ErrUserNotExists) {
+			log.Error("user not exists", logger.Err(err))
+			render.JSON(w, r, response.Error("user not exists"))
+			return
 		}
 		if err != nil {
-			log.Error("failed to save user", logger.Err(err))
-			render.JSON(w, r, response.Error("failed to save user"))
+			log.Error("failed to save segments for user", logger.Err(err))
+			render.JSON(w, r, response.Error("failed to save segments for user"))
 			return
 		}
 
-		log.Info("user added", slog.Int("user", user))
+		log.Info("segments added for user", slog.Int("user", user))
 
 		render.JSON(w, r, Response{
 			Response: response.OK(),

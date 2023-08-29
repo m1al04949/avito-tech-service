@@ -19,7 +19,7 @@ type Request struct {
 
 type Response struct {
 	response.Response
-	Segment string `json:"slug,omitempty"`
+	Segment string `json:"slug"`
 	Method  string
 }
 
@@ -68,6 +68,13 @@ func DelSegment(log *slog.Logger, segmDeleter SegmDeleter) http.HandlerFunc {
 			log.Info("segment not exists", slog.String("segment", req.Slug))
 
 			render.JSON(w, r, response.Error("segment not exists"))
+
+			return
+		}
+		if errors.Is(err, storage.ErrSegmentDelete) {
+			log.Info("delete segment from user segments table", slog.String("segment", segment))
+
+			render.JSON(w, r, response.Error("delete segment from user segments table"))
 
 			return
 		}
