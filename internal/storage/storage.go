@@ -104,6 +104,7 @@ func (s *Storage) SaveSegm(segmToSave string) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
+		defer stmt.Close()
 
 		_, err = stmt.Exec(segmToSave)
 		if err != nil {
@@ -135,6 +136,7 @@ func (s *Storage) DeleteSegm(segmToDelete string) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
+		defer stmt.Close()
 
 		_, err = stmt.Exec(segmToDelete)
 		if err != nil {
@@ -159,6 +161,7 @@ func (s *Storage) SaveUser(userToSave int) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
+		defer stmt.Close()
 
 		_, err = stmt.Exec(userToSave)
 		if err != nil {
@@ -190,6 +193,7 @@ func (s *Storage) DeleteUser(userToDelete int) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", op, err)
 		}
+		defer stmt.Close()
 
 		_, err = stmt.Exec(userToDelete)
 		if err != nil {
@@ -296,6 +300,34 @@ func (s *Storage) DeleteSegmFromUser(user int, segments []string) error {
 
 // Get User Info
 func (s *Storage) GetUser(user int) (segments []string, err error) {
+	const op = "storage.getuser"
+
+	var userExists bool
+
+	if err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE user_id=$1)",
+		user).Scan(&userExists); err != nil {
+		return segments, fmt.Errorf("%s: %w", op, err)
+	}
+	if !userExists {
+		return segments, fmt.Errorf("%s: %w", op, ErrUserNotExists)
+	}
+
+	rows, err := s.db.Query("SELECT segment_name FROM user_segments WHERE user_id = $1", user)
+	if err != nil {
+		return segments, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var segmentName string
+		if err := rows.Scan(&segmentName); err != nil {
+			return segments, fmt.Errorf("%s: %w", op, ErrSegmentsNotExists)
+		}
+		segments = append(segments, segmentName)
+	}
+	if err := rows.Err(); err != nil {
+		return segments, fmt.Errorf("%s: %w", op, err)
+	}
 
 	return segments, nil
 }
