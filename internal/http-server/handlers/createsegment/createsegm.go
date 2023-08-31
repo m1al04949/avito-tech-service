@@ -2,6 +2,7 @@ package createsegment
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -61,6 +62,12 @@ func NewSegment(log *slog.Logger, segmSaver SegmSaver) http.HandlerFunc {
 		}
 
 		segment := req.Slug
+		if segment == "" {
+			err := fmt.Errorf("segment name (slug) is empty")
+			log.Error("segment name (slug) is empty", logger.Err(err))
+			render.JSON(w, r, response.Error("segment name (slug) is empty"))
+			return
+		}
 
 		err = segmSaver.SaveSegm(segment)
 

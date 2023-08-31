@@ -2,6 +2,7 @@ package adduser
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -23,6 +24,7 @@ type Response struct {
 	Method string
 }
 
+//go:generate go run github.com/vektra/mockery/v2 --name=UserSaver
 type UserSaver interface {
 	SaveUser(int) error
 }
@@ -61,6 +63,12 @@ func AddUser(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 		}
 
 		user := req.UserID
+		if user == 0 {
+			err := fmt.Errorf("user_id is empty")
+			log.Error("user_id is empty", logger.Err(err))
+			render.JSON(w, r, response.Error("user_id is empty"))
+			return
+		}
 
 		err = userSaver.SaveUser(user)
 		if errors.Is(err, storage.ErrUserExists) {
