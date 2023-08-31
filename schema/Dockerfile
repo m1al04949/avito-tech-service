@@ -2,15 +2,15 @@ FROM golang:1.20
 
 RUN go version
 
-#Значение для переменной окружения
+# Value for environment variable
 ENV GOPATH=/
 
-# Копирование файлов проекта в контейнер
+# Copying Project Files to a Container
 COPY ./ ./
 
-# Установка зависимостей
+# Installing dependencies
 RUN go mod download
 RUN go build -o avito-tech-service ./cmd/avito-tech-service/main.go
 
-# Команда, выполняемая при запуске контейнера
+# The command to be executed when the container is starte
 CMD ["./avito-tech-service"]

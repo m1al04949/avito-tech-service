@@ -18,10 +18,10 @@ const (
 	host = "localhost:8082"
 )
 
-func TestAvitoService_Easy(t *testing.T) {
+func TestAvitoService_EasyHappy(t *testing.T) {
 
 	chars := []rune("ABCDEFGIHJKLMNOPQRSTVUWXYZ" +
-		"0123456789")
+		"0123456789_")
 
 	u := url.URL{
 		Scheme: "http",
@@ -31,6 +31,7 @@ func TestAvitoService_Easy(t *testing.T) {
 
 	user := rand.Intn(1000)
 
+	// Create some user
 	e.POST("/users").
 		WithJSON(adduser.Request{
 			UserID: user,
@@ -49,6 +50,7 @@ func TestAvitoService_Easy(t *testing.T) {
 	}
 	segment := string(segm)
 
+	// Create some segment
 	e.POST("/segments").
 		WithJSON(createsegment.Request{
 			Slug: segment,
@@ -66,10 +68,19 @@ func TestAvitoService_Easy(t *testing.T) {
 	segments = append(segments, newsegment)
 	id := strconv.Itoa(user)
 
+	// Add this segment to user
 	e.POST("/users/id="+id).
 		WithJSON(addtouser.Request{
 			Segments: segments,
 		}).
+		WithBasicAuth("myuser", "mypass").
+		Expect().
+		Status(200).
+		JSON().
+		Object()
+
+	// Get segment from user
+	e.GET("/users/id="+id).
 		WithBasicAuth("myuser", "mypass").
 		Expect().
 		Status(200).
